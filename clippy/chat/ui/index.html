@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clippy</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="header">
+    <span class="header-icon">📎</span>
+    <span class="header-title">Clippy</span>
+  </header>
+
+  <main class="transcript" id="transcript">
+    <!-- chat bubbles injected here -->
+  </main>
+
+  <footer class="input-bar">
+    <input
+      id="input"
+      class="input-field"
+      type="text"
+      placeholder="Message Clippy…"
+      autocomplete="off"
+    />
+    <button id="send-btn" class="send-btn" title="Send">
+      &#9654;
+    </button>
+  </footer>
+
+  <script src="chat.js"></script>
+</body>
+</html>

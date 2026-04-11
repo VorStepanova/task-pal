@@ -10,6 +10,7 @@ import rumps
 from clippy.config import Config
 from clippy.face import Face
 from clippy.monitor import Monitor
+from clippy.chat.window import ChatWindow
 
 
 class ClippyApp(rumps.App):
@@ -27,6 +28,8 @@ class ClippyApp(rumps.App):
         self._face = Face(self._config, self._monitor)
         self._tick_timer = rumps.Timer(self._tick, 5)
         self._tick_timer.start()
+        self._chat_window = ChatWindow()
+        self.menu = ["💬 Open Chat"]
 
     def _tick(self, _sender: rumps.Timer) -> None:
         """Timer callback — fires every 5 seconds on the main thread.
@@ -34,3 +37,7 @@ class ClippyApp(rumps.App):
         Updates the menu bar icon based on current monitor state and config.
         """
         self.title = self._face.current_icon()
+
+    @rumps.clicked("💬 Open Chat")
+    def _open_chat(self, _) -> None:
+        self._chat_window.open()
