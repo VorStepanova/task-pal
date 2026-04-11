@@ -1,0 +1,67 @@
+[
+  {
+    "name": "Leave for train",
+    "emoji": "🚉",
+    "context": "You always think you have more time than you do. You don't.",
+    "enabled": true,
+    "schedule": [
+      {
+        "days": ["mon", "tue", "wed", "thu", "fri"],
+        "remind_at": ["08:15"],
+        "escalate_at": ["08:30"]
+      }
+    ]
+  },
+  {
+    "name": "Get coffee",
+    "emoji": "☕",
+    "context": "You're nicer to people after coffee. This is a public service.",
+    "enabled": true,
+    "schedule": [
+      {
+        "days": ["mon", "tue", "wed", "thu", "fri"],
+        "remind_at": ["09:00"],
+        "escalate_at": []
+      }
+    ]
+  },
+  {
+    "name": "Lunch",
+    "emoji": "🥗",
+    "context": "Eat something real. Not just snacks.",
+    "enabled": true,
+    "schedule": [
+      {
+        "days": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+        "remind_at": ["12:30"],
+        "escalate_at": ["13:30"]
+      }
+    ]
+  },
+  {
+    "name": "Afternoon walk",
+    "emoji": "🚶",
+    "context": "You've been sitting for hours. Go outside for ten minutes.",
+    "enabled": true,
+    "schedule": [
+      {
+        "days": ["mon", "tue", "wed", "thu", "fri"],
+        "remind_at": ["15:00"],
+        "escalate_at": []
+      }
+    ]
+  },
+  {
+    "name": "Wind down",
+    "emoji": "🌙",
+    "context": "Stop starting new things. Wrap up, close your tabs, be a person.",
+    "enabled": true,
+    "schedule": [
+      {
+        "days": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+        "remind_at": ["21:00"],
+        "escalate_at": ["22:30"]
+      }
+    ]
+  }
+]
