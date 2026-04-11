@@ -8,3 +8,5 @@ dist/
 .venv/
 
 docs/
+
+reminders/default_config.json
