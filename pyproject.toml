@@ -1,0 +1,19 @@
+[project]
+name = "clippy"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Katerina Stepanova",email = "admin@curatelocal.com"}
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "rumps (>=0.4.0,<0.5.0)",
+    "anthropic (>=0.94.0,<0.95.0)",
+    "pywebview (>=6.1,<7.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
