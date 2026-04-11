@@ -15,6 +15,7 @@ from clippy.config import Config
 from clippy.face import Face
 from clippy.monitor import Monitor
 from clippy.chat.window import ChatWindow
+from clippy.reminders import scheduler
 
 
 class ClippyApp(rumps.App):
@@ -33,6 +34,7 @@ class ClippyApp(rumps.App):
         self._tick_timer = rumps.Timer(self._tick, 5)
         self._tick_timer.start()
         self._chat_window = ChatWindow()
+        scheduler.start()
         self.menu = ["💬 Open Chat", "Quit"]
 
     def _tick(self, _sender: rumps.Timer) -> None:

@@ -31,6 +31,7 @@ from clippy.chat.extractor import Extractor  # noqa: E402
 _client = ClippyClient()
 _extractor = Extractor()
 _window_ref = None  # set after webview.create_window(); used by check-in thread
+_INJECT_PATH = os.path.expanduser("~/.clippy_chat_inject.json")
 
 _INDEX_HTML = os.path.join(_HERE, "ui", "index.html")
 
@@ -136,6 +137,23 @@ def _checkin_loop() -> None:
             _fire(f"You've been in {app} for over 2 hours. Still on track? 🤔", "dwell")
 
 
+def _inject_loop() -> None:
+    while True:
+        time.sleep(10)
+        if not os.path.exists(_INJECT_PATH):
+            continue
+        try:
+            with open(_INJECT_PATH) as f:
+                data = json.load(f)
+            message = data.get("message", "")
+            if message and _window_ref is not None:
+                os.remove(_INJECT_PATH)
+                safe = message.replace("\\", "\\\\").replace("'", "\\'")
+                _window_ref.evaluate_js(f"injectAssistantMessage('{safe}')")
+        except Exception:
+            pass
+
+
 class ClippyBridge:
     """Exposes Python methods to the JS running in the webview.
 
@@ -171,6 +189,8 @@ def main() -> None:
     _window_ref = window
     _checkin_thread = threading.Thread(target=_checkin_loop, daemon=True, name="clippy-checkin")
     _checkin_thread.start()
+    _inject_thread = threading.Thread(target=_inject_loop, daemon=True, name="clippy-inject")
+    _inject_thread.start()
     webview.start()
 
 
