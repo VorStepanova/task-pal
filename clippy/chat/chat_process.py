@@ -22,14 +22,61 @@ load_dotenv(os.path.join(_PROJECT_ROOT, ".env"))
 
 import webview  # noqa: E402
 from clippy.chat.client import ClippyClient  # noqa: E402
+from clippy.chat.extractor import Extractor  # noqa: E402
 
 _client = ClippyClient()
+_extractor = Extractor()
 
 _INDEX_HTML = os.path.join(_HERE, "ui", "index.html")
 
 
 def _get_response(text: str) -> str:
-    return _client.send(text)
+    response = _client.send(text)
+
+    reminders = _extractor.extract_reminders(text)
+    if reminders:
+        _save_pending_reminders(reminders)
+
+    known_tasks = ["Meds", "Write the story", "Work on Story Crypt",
+                   "Work on Klink", "Curate Local", "Clean your room",
+                   "Do your actual job"]
+    completions = _extractor.extract_completions(text, known_tasks)
+    if completions:
+        _save_completions(completions)
+
+    return response
+
+
+def _save_pending_reminders(reminders: list) -> None:
+    """Write extracted reminders to ~/.clippy_pending_reminders.json."""
+    import json
+    path = os.path.expanduser("~/.clippy_pending_reminders.json")
+    existing = []
+    if os.path.exists(path):
+        try:
+            with open(path) as f:
+                existing = json.load(f)
+        except Exception:
+            pass
+    existing.extend(reminders)
+    with open(path, "w") as f:
+        json.dump(existing, f, indent=2)
+
+
+def _save_completions(completions: list) -> None:
+    """Write completed task names to ~/.clippy_completions.json."""
+    import json
+    path = os.path.expanduser("~/.clippy_completions.json")
+    existing = []
+    if os.path.exists(path):
+        try:
+            with open(path) as f:
+                existing = json.load(f)
+        except Exception:
+            pass
+    existing.extend(completions)
+    with open(path, "w") as f:
+        json.dump(existing, f, indent=2)
 
 
 class ClippyBridge:
