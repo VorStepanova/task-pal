@@ -1,6 +1,6 @@
 """Activity monitor for macOS — samples frontmost app and user idle time.
 
-This module has no imports from within the clippy package. It is a pure
+This module has no imports from within the taskpal package. It is a pure
 data-source: the background thread writes state, callers read it through
 the public snapshot methods.
 """
@@ -37,7 +37,7 @@ class Monitor:
         self._active_app: str = ""
         self._app_start: float = time.monotonic()
         self._idle_secs: float = 0.0
-        self._thread = threading.Thread(target=self._run, daemon=True, name="clippy-monitor")
+        self._thread = threading.Thread(target=self._run, daemon=True, name="taskpal-monitor")
 
     def start(self) -> None:
         """Start the background sampling thread.

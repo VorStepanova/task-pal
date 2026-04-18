@@ -33,7 +33,7 @@ def _show_modal(label: str) -> bool:
         'try',
         '    display dialog '
         f'"\\n⏰  {label}\\n\\nThis reminder has been waiting for you." '
-        'with title "Clippy — Action Required" '
+        'with title "TaskPal — Action Required" '
         'buttons {"Got it"} '
         'default button "Got it" '
         'with icon stop',

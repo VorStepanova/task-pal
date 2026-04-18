@@ -1,6 +1,6 @@
 """Menu bar icon selection — maps current activity state to an icon string.
 
-face.py imports from clippy.config and clippy.monitor because app.py passes
+face.py imports from taskpal.config and taskpal.monitor because app.py passes
 live instances in. This is expected per ARCHITECTURE.md: face.py sits one
 layer above the leaf modules.
 """
@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from clippy.config import Config
-from clippy.monitor import Monitor
+from taskpal.config import Config
+from taskpal.monitor import Monitor
 
 
 class Face:
@@ -67,7 +67,7 @@ class Face:
 
         # Load pending reminders
         pending: list[dict] = []
-        pending_path = os.path.expanduser("~/.clippy_pending_reminders.json")
+        pending_path = os.path.expanduser("~/.taskpal_pending_reminders.json")
         try:
             if os.path.exists(pending_path):
                 with open(pending_path) as f:
@@ -77,7 +77,7 @@ class Face:
 
         # Load completions
         completions: list[dict] = []
-        completions_path = os.path.expanduser("~/.clippy_completions.json")
+        completions_path = os.path.expanduser("~/.taskpal_completions.json")
         try:
             if os.path.exists(completions_path):
                 with open(completions_path) as f:

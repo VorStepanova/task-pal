@@ -1,7 +1,7 @@
 """Config-based reminder scheduler.
 
 Reads config JSON every 5 minutes and queues the NEXT upcoming reminder
-per task into ~/.clippy_pending_reminders.json. Only one pending entry per
+per task into ~/.taskpal_pending_reminders.json. Only one pending entry per
 label at a time — the next time slot is queued after the current one is
 completed or dismissed. Clears dismissed state at midnight.
 """
@@ -14,13 +14,13 @@ import threading
 import time
 from datetime import datetime, timedelta
 
-from clippy.config import is_demo
-from clippy.reminders.state import is_dismissed_today, DISMISSED_PATH
+from taskpal.config import is_demo
+from taskpal.reminders.state import is_dismissed_today, DISMISSED_PATH
 
 _REMINDERS_DIR = os.path.join(
     os.path.dirname(__file__), "..", "..", "reminders",
 )
-_PENDING_PATH = os.path.expanduser("~/.clippy_pending_reminders.json")
+_PENDING_PATH = os.path.expanduser("~/.taskpal_pending_reminders.json")
 _POLL_INTERVAL = 300  # 5 minutes
 
 _DAY_MAP = {
@@ -169,6 +169,6 @@ def _loop() -> None:
 def start() -> None:
     """Start the config scheduler daemon thread. Call once from app.py."""
     t = threading.Thread(
-        target=_loop, daemon=True, name="clippy-config-scheduler"
+        target=_loop, daemon=True, name="taskpal-config-scheduler"
     )
     t.start()

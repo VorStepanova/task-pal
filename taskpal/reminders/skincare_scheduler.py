@@ -1,7 +1,7 @@
 """Skincare reminder scheduler.
 
 Reads skincare_config.json and queues AM/PM reminders with Full/Lazy
-buttons into ~/.clippy_inject_queue.json. Runs on boot and re-queues
+buttons into ~/.taskpal_inject_queue.json. Runs on boot and re-queues
 at midnight. Also handles button action responses.
 """
 
@@ -14,7 +14,7 @@ import threading
 import time
 from datetime import datetime, timedelta
 
-from clippy.config import is_demo
+from taskpal.config import is_demo
 
 _REMINDERS_DIR = os.path.join(
     os.path.dirname(__file__), "..", "..", "reminders",
@@ -24,7 +24,7 @@ _REMINDERS_DIR = os.path.join(
 def _config_path() -> str:
     filename = "demo_skincare_config.json" if is_demo() else "skincare_config.json"
     return os.path.join(_REMINDERS_DIR, filename)
-_INJECT_QUEUE_PATH = os.path.expanduser("~/.clippy_inject_queue.json")
+_INJECT_QUEUE_PATH = os.path.expanduser("~/.taskpal_inject_queue.json")
 
 _DAY_MAP = {
     0: "mon", 1: "tue", 2: "wed", 3: "thu",
@@ -229,6 +229,6 @@ def start() -> None:
         target=_loop,
         args=(config,),
         daemon=True,
-        name="clippy-skincare",
+        name="taskpal-skincare",
     )
     t.start()

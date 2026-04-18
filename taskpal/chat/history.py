@@ -1,6 +1,6 @@
 """Session history — writes chat sessions to disk and generates handoffs.
 
-Each session is saved as a JSON file in ~/.clippy_history/ when the user
+Each session is saved as a JSON file in ~/.taskpal_history/ when the user
 starts a new chat. History is only written when history_enabled is True
 in config. The handoff summary is always generated regardless of whether
 history is saved.
@@ -15,9 +15,9 @@ from typing import Any
 
 import anthropic
 
-HISTORY_DIR = os.path.expanduser("~/.clippy_history")
-COMPLETIONS_PATH = os.path.expanduser("~/.clippy_completions.json")
-PENDING_PATH = os.path.expanduser("~/.clippy_pending_reminders.json")
+HISTORY_DIR = os.path.expanduser("~/.taskpal_history")
+COMPLETIONS_PATH = os.path.expanduser("~/.taskpal_completions.json")
+PENDING_PATH = os.path.expanduser("~/.taskpal_pending_reminders.json")
 
 _MODEL = "claude-haiku-4-5"
 _MAX_TOKENS = 512

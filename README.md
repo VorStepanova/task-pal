@@ -1,36 +1,36 @@
-# Clippy
+# TaskPal
 
 A personal judgy AI-powered accountability companion that lives in your macOS menu bar.
 
-Clippy is a solo project built to solve a specific problem: I needed something 
+TaskPal is a solo project built to solve a specific problem: I needed something 
 that could hear me, not just remind me. Scheduled reminders don't know that 
 you're stressed, or that you mentioned something important in passing, or that 
-you've been in the same app for four hours. Clippy does.
+you've been in the same app for four hours. TaskPal does.
 
 ---
 
 ## What It Does
 
 - **Lives in the menu bar** with an icon that changes based on mood and state
-- **Chat window** — talk to Claude directly; Clippy reads your context and responds
-- **Time-aware** — every message is timestamped so Clippy knows what time it is 
+- **Chat window** — talk to Claude directly; TaskPal reads your context and responds
+- **Time-aware** — every message is timestamped so TaskPal knows what time it is 
   and can reason about it
-- **Ad-hoc reminders** — mention something time-sensitive in chat and Clippy 
+- **Ad-hoc reminders** — mention something time-sensitive in chat and TaskPal 
   extracts it and fires a real reminder when the time comes
 - **Activity monitoring** — watches which app is in focus, how long, and when 
   you've gone idle
 - **Scheduled reminders** — replaces nudge.py; same escalation modals, streaks, 
   and snooze logic, just bigger
-- **Escalation** — if you ignore something long enough, Clippy stops asking nicely
+- **Escalation** — if you ignore something long enough, TaskPal stops asking nicely
 
 ---
 
 ## Project Structure
 
 ```
-clippy/
+.
 ├── main.py              # Entry point
-├── clippy/
+├── taskpal/
 │   ├── app.py           # rumps menubar app, menu building, orchestration
 │   ├── monitor.py       # Activity monitoring: app focus, idle detection, duration
 │   ├── face.py          # Icon logic and mood states

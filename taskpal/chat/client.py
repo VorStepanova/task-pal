@@ -1,4 +1,4 @@
-"""Anthropic API client for Clippy chat.
+"""Anthropic API client for TaskPal chat.
 
 This is the only file in the project that imports the anthropic SDK.
 It maintains conversation history for the lifetime of the process (one
@@ -12,14 +12,14 @@ from typing import Any
 
 import anthropic
 
-from clippy.chat.history import save_session, build_handoff_message
-from clippy.config import is_demo
+from taskpal.chat.history import save_session, build_handoff_message
+from taskpal.config import is_demo
 
 
 _MODEL = "claude-sonnet-4-6"
 _MAX_TOKENS = 1024
 _SYSTEM_PROMPT = (
-    "You are Clippy, a personal accountability companion living in the user's "
+    "You are TaskPal, a personal accountability companion living in the user's "
     "macOS menu bar. You are warm, direct, and a little opinionated. You help "
     "the user stay on track, think through problems, and remember things. Keep "
     "replies concise — this is a chat window, not an essay. You always know "
@@ -32,7 +32,7 @@ _SYSTEM_PROMPT = (
 )
 
 _DEMO_SYSTEM_PROMPT = (
-    "You are Clippy, a personal accountability companion living in the user's "
+    "You are TaskPal, a personal accountability companion living in the user's "
     "macOS menu bar. You are warm, direct, and a little opinionated. You help "
     "the user stay on track, think through problems, and remember things. Keep "
     "replies concise — this is a chat window, not an essay. You always know "
@@ -48,12 +48,12 @@ _DEMO_SYSTEM_PROMPT = (
 )
 
 
-class ClippyClient:
+class TaskPalClient:
     """Wraps the Anthropic API and maintains per-session conversation history.
 
     Each instance represents one chat session. History accumulates with every
     call to send() and can be wiped with clear_history(). Because
-    chat_process.py creates exactly one ClippyClient at module level,
+    chat_process.py creates exactly one TaskPalClient at module level,
     history naturally resets whenever the window is closed and reopened
     (a fresh subprocess is spawned each time).
     """
@@ -84,7 +84,7 @@ class ClippyClient:
         """
         if self._client is None:
             return (
-                "⚠️ Clippy can't reach Claude right now. "
+                "⚠️ TaskPal can't reach Claude right now. "
                 "Check your API key in .env."
             )
 
@@ -122,13 +122,13 @@ class ClippyClient:
         except anthropic.AuthenticationError:
             self._history.pop()
             return (
-                "⚠️ Clippy can't reach Claude right now. "
+                "⚠️ TaskPal can't reach Claude right now. "
                 "Check your API key in .env."
             )
         except Exception:
             self._history.pop()
             return (
-                "⚠️ Clippy can't reach Claude right now. "
+                "⚠️ TaskPal can't reach Claude right now. "
                 "Check your API key in .env."
             )
 

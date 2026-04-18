@@ -188,7 +188,7 @@
       api = await waitForBridge();
       removeStatus();
     } catch (_err) {
-      connectingEl.textContent = "⚠️ Could not connect to Clippy bridge.";
+      connectingEl.textContent = "⚠️ Could not connect to TaskPal bridge.";
       setUiBusy(false);
       return;
     }

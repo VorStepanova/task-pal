@@ -1,7 +1,7 @@
 """Reminder and completion extraction from chat messages.
 
 Makes a separate lightweight Anthropic API call to extract structured data
-from user messages. Intentionally isolated — no imports from within clippy/.
+from user messages. Intentionally isolated — no imports from within taskpal/.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ class Extractor:
     """Parses user messages for reminder candidates and auto-complete signals.
 
     Makes lightweight, isolated Anthropic API calls — completely separate from
-    the conversation history in ClippyClient. Returns empty results on any
+    the conversation history in ``TaskPalClient``. Returns empty results on any
     error so the chat is never disrupted.
     """
 

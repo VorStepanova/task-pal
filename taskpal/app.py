@@ -1,4 +1,4 @@
-"""Clippy menu bar application — orchestration layer.
+"""TaskPal menu bar application — orchestration layer.
 
 This module owns the rumps event loop, all timers, and the wiring between
 every other module. It is the single place where observations (from monitor,
@@ -12,20 +12,20 @@ from datetime import datetime
 
 import rumps
 
-from clippy.config import Config
-from clippy.face import Face
-from clippy.monitor import Monitor
-from clippy.chat.window import ChatWindow
-from clippy.reminders import scheduler
-from clippy.reminders import config_scheduler
-from clippy.reminders import skincare_scheduler
-from clippy.reminders.state import (
+from taskpal.config import Config
+from taskpal.face import Face
+from taskpal.monitor import Monitor
+from taskpal.chat.window import ChatWindow
+from taskpal.reminders import scheduler
+from taskpal.reminders import config_scheduler
+from taskpal.reminders import skincare_scheduler
+from taskpal.reminders.state import (
     load_pending, log_fired, remove_fired, remove_all_for_label,
     dismiss_today, snooze_for_hours,
 )
 
 
-class ClippyApp(rumps.App):
+class TaskPalApp(rumps.App):
     """rumps application — boots all subsystems and owns the timer loop.
 
     Instantiates Config, Monitor, and Face; starts the monitor thread; and
@@ -85,7 +85,7 @@ class ClippyApp(rumps.App):
         return rows
 
     def _sync_pending_menu(self) -> None:
-        """Rebuild Pending section above Quit from ~/.clippy_pending_reminders.json."""
+        """Rebuild Pending section above Quit from ~/.taskpal_pending_reminders.json."""
         for key in self._pending_menu_keys:
             try:
                 del self.menu[key]
@@ -151,7 +151,7 @@ class ClippyApp(rumps.App):
             "idle_secs": self._monitor.idle_duration(),
             "sampled_at": datetime.now().isoformat(timespec="seconds"),
         }
-        path = os.path.expanduser("~/.clippy_monitor_state.json")
+        path = os.path.expanduser("~/.taskpal_monitor_state.json")
         try:
             with open(path, "w") as f:
                 json.dump(snapshot, f, indent=2)
@@ -159,10 +159,10 @@ class ClippyApp(rumps.App):
             pass  # never let a write failure crash the main thread
 
     def _push_chat_face(self) -> None:
-        """Write the current chat face emoji to ~/.clippy_face_state.json."""
+        """Write the current chat face emoji to ~/.taskpal_face_state.json."""
         try:
             emoji = self._face.current_chat_face()
-            path = os.path.expanduser("~/.clippy_face_state.json")
+            path = os.path.expanduser("~/.taskpal_face_state.json")
             with open(path, "w") as f:
                 import json
                 json.dump({"face": emoji}, f)
@@ -202,7 +202,7 @@ class ClippyApp(rumps.App):
 
     @rumps.clicked("🔄 Restart")
     def _restart(self, _) -> None:
-        """Spawn a fresh Clippy process, then quit this one."""
+        """Spawn a fresh TaskPal process, then quit this one."""
         self._chat_window.close()
         import subprocess
         env = os.environ.copy()

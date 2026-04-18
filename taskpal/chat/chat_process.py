@@ -5,7 +5,7 @@ pywebview can take the main thread freely — rumps already owns the main
 thread in the parent process and macOS does not allow two AppKit event
 loops to share a thread.
 
-Do NOT import this module from app.py or any other clippy module. It is
+Do NOT import this module from app.py or any other taskpal module. It is
 an entry point only; subprocess.Popen is the only caller.
 """
 
@@ -16,24 +16,24 @@ import threading
 import time
 from datetime import datetime, timedelta
 
-# Resolve the project root (three levels up: chat_process.py → chat/ → clippy/ → project root)
+# Resolve the project root (three levels up: chat_process.py → chat/ → taskpal/ → project root)
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(_HERE))
 
-# Load .env before any other clippy imports so API keys are available
+# Load .env before any other taskpal imports so API keys are available
 from dotenv import load_dotenv  # noqa: E402
 load_dotenv(os.path.join(_PROJECT_ROOT, ".env"))
 
 import webview  # noqa: E402
-from clippy.chat.client import ClippyClient  # noqa: E402
-from clippy.chat.extractor import Extractor  # noqa: E402
-from clippy.reminders import streak  # noqa: E402
+from taskpal.chat.client import TaskPalClient  # noqa: E402
+from taskpal.chat.extractor import Extractor  # noqa: E402
+from taskpal.reminders import streak  # noqa: E402
 
-_client = ClippyClient()
+_client = TaskPalClient()
 _extractor = Extractor()
 _window_ref = None  # set after webview.create_window(); used by check-in thread
-_INJECT_QUEUE_PATH = os.path.expanduser("~/.clippy_inject_queue.json")
-_FACE_STATE_PATH = os.path.expanduser("~/.clippy_face_state.json")
+_INJECT_QUEUE_PATH = os.path.expanduser("~/.taskpal_inject_queue.json")
+_FACE_STATE_PATH = os.path.expanduser("~/.taskpal_face_state.json")
 
 _INDEX_HTML = os.path.join(_HERE, "ui", "index.html")
 
@@ -57,7 +57,7 @@ def _is_agenda_query(text: str) -> bool:
 
 def _load_agenda_items() -> list[dict]:
     """Load pending reminders deduped by label (earliest due_at wins)."""
-    from clippy.reminders.state import load_pending
+    from taskpal.reminders.state import load_pending
     seen: dict[str, dict] = {}
     for r in load_pending():
         label = r.get("label", "")
@@ -102,9 +102,9 @@ def _get_response(text: str) -> str:
 
 
 def _save_pending_reminders(reminders: list) -> None:
-    """Write extracted reminders to ~/.clippy_pending_reminders.json."""
+    """Write extracted reminders to ~/.taskpal_pending_reminders.json."""
     import json
-    path = os.path.expanduser("~/.clippy_pending_reminders.json")
+    path = os.path.expanduser("~/.taskpal_pending_reminders.json")
     existing = []
     if os.path.exists(path):
         try:
@@ -118,9 +118,9 @@ def _save_pending_reminders(reminders: list) -> None:
 
 
 def _save_completions(completions: list) -> None:
-    """Write completed task names to ~/.clippy_completions.json."""
+    """Write completed task names to ~/.taskpal_completions.json."""
     import json
-    path = os.path.expanduser("~/.clippy_completions.json")
+    path = os.path.expanduser("~/.taskpal_completions.json")
     existing = []
     if os.path.exists(path):
         try:
@@ -147,7 +147,7 @@ _last_fired: dict[str, datetime] = {}
 
 
 def _read_monitor_snapshot() -> dict | None:
-    path = os.path.expanduser("~/.clippy_monitor_state.json")
+    path = os.path.expanduser("~/.taskpal_monitor_state.json")
     try:
         with open(path) as f:
             return json.load(f)
@@ -262,7 +262,7 @@ def _face_loop() -> None:
             pass
 
 
-class ClippyBridge:
+class TaskPalBridge:
     """Exposes Python methods to the JS running in the webview.
 
     Each public method becomes callable from JavaScript as
@@ -283,7 +283,7 @@ class ClippyBridge:
 
     def new_chat(self) -> None:
         """Save current session, reset history, inject handoff into new chat."""
-        from clippy.config import Config
+        from taskpal.config import Config
         config = Config()
         history_enabled = config.get("history_enabled", True)
 
@@ -310,8 +310,8 @@ class ClippyBridge:
         import json
         from datetime import datetime
 
-        pending_path = os.path.expanduser("~/.clippy_pending_reminders.json")
-        completions_path = os.path.expanduser("~/.clippy_completions.json")
+        pending_path = os.path.expanduser("~/.taskpal_pending_reminders.json")
+        completions_path = os.path.expanduser("~/.taskpal_completions.json")
 
         # Remove all pending reminders matching this label
         try:
@@ -342,33 +342,33 @@ class ClippyBridge:
 
     def dismiss_reminder(self, label: str) -> None:
         """Dismiss a reminder for today — stops all further nudges."""
-        from clippy.config import is_demo
+        from taskpal.config import is_demo
         if is_demo():
             return
-        from clippy.reminders.state import dismiss_today
+        from taskpal.reminders.state import dismiss_today
         dismiss_today(label)
 
     def snooze_reminder(self, label: str, hours: int) -> None:
         """Snooze a reminder for N hours."""
-        from clippy.config import is_demo
+        from taskpal.config import is_demo
         if is_demo():
             return
-        from clippy.reminders.state import snooze_for_hours
+        from taskpal.reminders.state import snooze_for_hours
         snooze_for_hours(label, hours)
 
     def handle_action(self, action: str) -> None:
         """Handle a button action from an injected bubble."""
-        from clippy.reminders.skincare_scheduler import get_action_response
-        from clippy.reminders.scheduler import _enqueue_inject
+        from taskpal.reminders.skincare_scheduler import get_action_response
+        from taskpal.reminders.scheduler import _enqueue_inject
         response = get_action_response(action)
         if response:
             _enqueue_inject(response)
 
 
 def main() -> None:
-    bridge = ClippyBridge()
+    bridge = TaskPalBridge()
     window = webview.create_window(
-        title="Clippy",
+        title="TaskPal",
         url=f"file://{_INDEX_HTML}",
         js_api=bridge,
         width=380,
@@ -380,11 +380,11 @@ def main() -> None:
     )
     global _window_ref
     _window_ref = window
-    _checkin_thread = threading.Thread(target=_checkin_loop, daemon=True, name="clippy-checkin")
+    _checkin_thread = threading.Thread(target=_checkin_loop, daemon=True, name="taskpal-checkin")
     _checkin_thread.start()
-    _inject_thread = threading.Thread(target=_inject_loop, daemon=True, name="clippy-inject")
+    _inject_thread = threading.Thread(target=_inject_loop, daemon=True, name="taskpal-inject")
     _inject_thread.start()
-    _face_thread = threading.Thread(target=_face_loop, daemon=True, name="clippy-face")
+    _face_thread = threading.Thread(target=_face_loop, daemon=True, name="taskpal-face")
     _face_thread.start()
     streak.start()
     webview.start()

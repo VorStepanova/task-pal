@@ -1,7 +1,7 @@
 """State management for pending reminders.
 
 Converts raw extractor output (due_in_minutes) into absolute due_at
-timestamps and rewrites ~/.clippy_pending_reminders.json in resolved form.
+timestamps and rewrites ~/.taskpal_pending_reminders.json in resolved form.
 Deduplicates by (label, due_at) so repeated extractions don't stack.
 """
 
@@ -11,9 +11,9 @@ import json
 import os
 from datetime import datetime, timedelta
 
-PENDING_PATH = os.path.expanduser("~/.clippy_pending_reminders.json")
-COMPLETIONS_PATH = os.path.expanduser("~/.clippy_completions.json")
-DISMISSED_PATH = os.path.expanduser("~/.clippy_dismissed_today.json")
+PENDING_PATH = os.path.expanduser("~/.taskpal_pending_reminders.json")
+COMPLETIONS_PATH = os.path.expanduser("~/.taskpal_completions.json")
+DISMISSED_PATH = os.path.expanduser("~/.taskpal_dismissed_today.json")
 
 
 def _load_raw() -> list[dict]:
@@ -27,12 +27,12 @@ def _load_raw() -> list[dict]:
 
 
 def load_pending() -> list[dict]:
-    """Read ~/.clippy_pending_reminders.json without resolving or rewriting."""
+    """Read ~/.taskpal_pending_reminders.json without resolving or rewriting."""
     return _load_raw()
 
 
 def log_fired(label: str) -> None:
-    """Append a reminder completion to ~/.clippy_completions.json."""
+    """Append a reminder completion to ~/.taskpal_completions.json."""
     existing: list[dict] = []
     if os.path.exists(COMPLETIONS_PATH):
         try:

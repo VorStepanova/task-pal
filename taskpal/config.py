@@ -1,7 +1,7 @@
-"""User configuration — loads from and saves to ~/.clippy_config.json.
+"""User configuration — loads from and saves to ~/.taskpal_config.json.
 
 All other modules read config through this module, never directly from disk.
-This module has no imports from within the clippy package.
+This module has no imports from within the taskpal package.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-CONFIG_PATH: Path = Path.home() / ".clippy_config.json"
+CONFIG_PATH: Path = Path.home() / ".taskpal_config.json"
 
 DEFAULTS: dict[str, Any] = {
     "idle_threshold": 300,
@@ -29,9 +29,9 @@ DEFAULTS: dict[str, Any] = {
 
 
 def is_demo() -> bool:
-    """Check if demo mode is active via config file or CLIPPY_DEMO env var."""
+    """Check if demo mode is active via config file or TASKPAL_DEMO env var."""
     import os
-    if os.environ.get("CLIPPY_DEMO", "").strip() in ("1", "true", "yes"):
+    if os.environ.get("TASKPAL_DEMO", "").strip() in ("1", "true", "yes"):
         return True
     if CONFIG_PATH.exists():
         try:

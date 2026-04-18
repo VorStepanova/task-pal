@@ -1,7 +1,7 @@
 """Streak awareness — detects project gaps and wins across history files.
 
 Runs twice daily (9 AM and 6 PM) as a daemon thread. Writes proactive
-messages to ~/.clippy_chat_inject.json for chat_process.py to pick up.
+messages to ~/.taskpal_chat_inject.json for chat_process.py to pick up.
 """
 
 from __future__ import annotations
@@ -12,9 +12,9 @@ import threading
 import time
 from datetime import datetime, timedelta
 
-HISTORY_DIR = os.path.expanduser("~/.clippy_history")
-COMPLETIONS_PATH = os.path.expanduser("~/.clippy_completions.json")
-INJECT_PATH = os.path.expanduser("~/.clippy_chat_inject.json")
+HISTORY_DIR = os.path.expanduser("~/.taskpal_history")
+COMPLETIONS_PATH = os.path.expanduser("~/.taskpal_completions.json")
+INJECT_PATH = os.path.expanduser("~/.taskpal_chat_inject.json")
 
 _STORY_CRYPT_KEYWORDS = {
     "story crypt", "storycrypt", "tiptap", "world bible", "bootstrap",
@@ -246,6 +246,6 @@ def _streak_loop() -> None:
 def start() -> None:
     """Start the streak checker daemon thread. Call once from chat_process.py."""
     t = threading.Thread(
-        target=_streak_loop, daemon=True, name="clippy-streaks"
+        target=_streak_loop, daemon=True, name="taskpal-streaks"
     )
     t.start()

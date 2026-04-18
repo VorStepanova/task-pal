@@ -2,10 +2,10 @@
 
 Runs as a daemon thread started from app.py. Fires a reminder by:
 - Sending a macOS notification
-- Writing to ~/.clippy_chat_inject.json for chat_process.py to pick up
+- Writing to ~/.taskpal_chat_inject.json for chat_process.py to pick up
 
 Removes fired reminders from the pending file and logs them to
-~/.clippy_completions.json.
+~/.taskpal_completions.json.
 """
 
 from __future__ import annotations
@@ -21,16 +21,16 @@ import subprocess
 
 import anthropic
 
-from clippy.reminders.state import (
+from taskpal.reminders.state import (
     PENDING_PATH,
     log_fired,
     remove_fired,
     resolve_pending,
 )
-from clippy.reminders.escalator import escalate
+from taskpal.reminders.escalator import escalate
 
-INJECT_QUEUE_PATH = os.path.expanduser("~/.clippy_inject_queue.json")
-_MONITOR_STATE_PATH = os.path.expanduser("~/.clippy_monitor_state.json")
+INJECT_QUEUE_PATH = os.path.expanduser("~/.taskpal_inject_queue.json")
+_MONITOR_STATE_PATH = os.path.expanduser("~/.taskpal_monitor_state.json")
 _ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 _NUDGE_MODEL = "claude-haiku-4-5"
 _POLL_INTERVAL = 60  # seconds
@@ -42,7 +42,7 @@ def _notify(label: str, message: str) -> None:
     safe_message = message.replace('"', "'")
     script = (
         f'display notification "{safe_message}" '
-        f'with title "⏰ Clippy Reminder" '
+        f'with title "⏰ TaskPal Reminder" '
         f'subtitle "{safe_label}"'
     )
     try:
@@ -151,7 +151,7 @@ def _generate_nudge(label: str, context: str) -> str:
             model=_NUDGE_MODEL,
             max_tokens=80,
             system=(
-                "You are Clippy, a warm but direct personal accountability "
+                "You are TaskPal, a warm but direct personal accountability "
                 "companion. Write ONE short sentence (max 12 words) nudging "
                 "the user about their reminder. Use the context provided to "
                 "make it personal and specific. Be warm but a little cheeky. "
@@ -245,5 +245,5 @@ def _scheduler_loop() -> None:
 
 def start() -> None:
     """Start the scheduler daemon thread. Call once from app.py."""
-    t = threading.Thread(target=_scheduler_loop, daemon=True, name="clippy-scheduler")
+    t = threading.Thread(target=_scheduler_loop, daemon=True, name="taskpal-scheduler")
     t.start()

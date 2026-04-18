@@ -1,4 +1,4 @@
-"""pywebview window lifecycle for the Clippy chat UI.
+"""pywebview window lifecycle for the TaskPal chat UI.
 
 This module owns the chat window's process lifecycle: spawning chat_process.py
 as a subprocess and detecting whether it is still running. The Python↔JS
