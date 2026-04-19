@@ -23,8 +23,7 @@ import anthropic
 
 from taskpal.reminders.state import (
     PENDING_PATH,
-    log_fired,
-    remove_fired,
+    mark_done,
     resolve_pending,
 )
 from taskpal.reminders.escalator import escalate
@@ -35,6 +34,12 @@ _ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 _NUDGE_MODEL = "claude-haiku-4-5"
 _POLL_INTERVAL = 60  # seconds
 
+# Notification sound for scheduler fires. Kept distinct from cursor_nanny's
+# palette (Tink / Ping / Sosumi) so the two tools are audibly separable.
+# Swap to any of: Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse,
+# Pop, Purr, Submarine — all live in /System/Library/Sounds/.
+_NOTIFY_SOUND = "Hero"
+
 
 def _notify(label: str, message: str) -> None:
     """Send a macOS notification via osascript — safe from any thread."""
@@ -43,7 +48,8 @@ def _notify(label: str, message: str) -> None:
     script = (
         f'display notification "{safe_message}" '
         f'with title "⏰ TaskPal Reminder" '
-        f'subtitle "{safe_label}"'
+        f'subtitle "{safe_label}" '
+        f'sound name "{_NOTIFY_SOUND}"'
     )
     try:
         subprocess.Popen(["osascript", "-e", script])
@@ -126,25 +132,87 @@ def _defer_next_fire_only(label: str, due_at: str) -> None:
         pass
 
 
-def _read_idle_secs() -> int:
-    """Seconds idle from monitor snapshot; 0 if missing or unreadable."""
+def _read_monitor_snapshot() -> dict:
+    """Full monitor snapshot; empty dict if missing or unreadable."""
     if not os.path.exists(_MONITOR_STATE_PATH):
-        return 0
+        return {}
     try:
         with open(_MONITOR_STATE_PATH) as f:
-            snap = json.load(f)
-        return int(snap.get("idle_secs", 0))
+            return json.load(f)
     except Exception:
+        return {}
+
+
+def _read_idle_secs() -> int:
+    """Seconds idle from monitor snapshot; 0 if missing or unreadable."""
+    snap = _read_monitor_snapshot()
+    try:
+        return int(snap.get("idle_secs", 0))
+    except (TypeError, ValueError):
         return 0
+
+
+def _remaining_agenda(now: datetime, current_label: str) -> list[str]:
+    """Other pending reminders still upcoming today, for prompt context."""
+    out: list[str] = []
+    try:
+        with open(PENDING_PATH) as f:
+            rows = json.load(f)
+    except Exception:
+        return out
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        if r.get("label") == current_label:
+            continue
+        if r.get("status") in ("done", "dismissed"):
+            continue
+        due_str = r.get("due_at", "")
+        try:
+            due = datetime.fromisoformat(due_str)
+        except (ValueError, TypeError):
+            continue
+        if due.date() != now.date() or due < now:
+            continue
+        out.append(f"{r.get('label', '')} at {due.strftime('%-I:%M %p')}")
+    return out
 
 
 def _generate_nudge(label: str, context: str) -> str:
-    """Generate a fresh in-character nudge message using Haiku.
+    """Ask Haiku if it wants to add commentary to this reminder fire.
 
-    Falls back to a plain label-based message on any error.
+    Supplies current time, the user's active-app/idle snapshot, and today's
+    remaining agenda so Claude's addition can be contextual. If Claude
+    returns an empty string (nothing worth saying), we fall back to a plain
+    label-only nudge.
     """
-    if not _ANTHROPIC_API_KEY or not context:
-        return f"⏰ {label} — time to check in."
+    plain = f"⏰ {label} — time to check in."
+    if not _ANTHROPIC_API_KEY:
+        return plain
+    now = datetime.now()
+    snap = _read_monitor_snapshot()
+    active_app = snap.get("active_app") or "unknown"
+    idle_secs = 0
+    try:
+        idle_secs = int(snap.get("idle_secs", 0))
+    except (TypeError, ValueError):
+        pass
+    idle_min = idle_secs // 60
+    agenda = _remaining_agenda(now, label)
+    agenda_str = "; ".join(agenda) if agenda else "nothing else today"
+
+    user_content = (
+        f"Reminder about to fire: {label}\n"
+        f"Static context for this reminder: {context or '(none)'}\n"
+        f"Current time: {now.strftime('%-I:%M %p, %A')}\n"
+        f"Active app: {active_app}\n"
+        f"User idle for: {idle_min} min\n"
+        f"Remaining agenda today: {agenda_str}\n\n"
+        "If you have something genuinely useful or warm to add, write ONE "
+        "sentence (max 14 words). If you have nothing meaningful to add, "
+        "reply with a single dash: -"
+    )
+
     try:
         client = anthropic.Anthropic(api_key=_ANTHROPIC_API_KEY)
         response = client.messages.create(
@@ -152,31 +220,36 @@ def _generate_nudge(label: str, context: str) -> str:
             max_tokens=80,
             system=(
                 "You are TaskPal, a warm but direct personal accountability "
-                "companion. Write ONE short sentence (max 12 words) nudging "
-                "the user about their reminder. Use the context provided to "
-                "make it personal and specific. Be warm but a little cheeky. "
+                "companion. A scheduled reminder is about to fire. You're "
+                "being asked: anything to add? Use the context to decide. "
+                "Be personal, specific, and a little cheeky when you speak. "
+                "Silence is fine — prefer a dash over generic filler. "
                 "No preamble. No emoji unless it fits naturally."
             ),
-            messages=[{
-                "role": "user",
-                "content": f"Reminder: {label}\nContext: {context}"
-            }],
+            messages=[{"role": "user", "content": user_content}],
         )
-        return f"⏰ {label} — {response.content[0].text.strip()}"
+        reply = response.content[0].text.strip()
     except Exception:
-        return f"⏰ {label} — time to check in."
+        return plain
+
+    if not reply or reply == "-":
+        return plain
+    return f"⏰ {label} — {reply}"
 
 
 def _check_and_fire() -> None:
-    idle_secs = _read_idle_secs()
-    if idle_secs >= 3600:
-        return
-
-    escalation_frozen = idle_secs >= 1800
+    # Idle only freezes *escalation* (modals + voice) — a notification still
+    # fires and the inject queue still gets the message, so when the user
+    # returns nothing has been silently lost.
+    escalation_frozen = _read_idle_secs() >= 1800
 
     now = datetime.now()
     pending = resolve_pending()
     for reminder in pending:
+        # Done/dismissed rows stay in the menu for UX, but must not fire.
+        if reminder.get("status") in ("done", "dismissed"):
+            continue
+
         due_at_str = reminder.get("due_at", "")
         label = reminder.get("label", "Reminder")
 
@@ -192,22 +265,6 @@ def _check_and_fire() -> None:
         try:
             due_at = datetime.fromisoformat(due_at_str)
         except ValueError:
-            continue
-
-        stale_cutoff = now - timedelta(minutes=60)
-        next_fire_dt: datetime | None = None
-        if next_fire_str:
-            try:
-                next_fire_dt = datetime.fromisoformat(next_fire_str)
-            except ValueError:
-                pass
-
-        if next_fire_dt is not None:
-            if next_fire_dt < stale_cutoff:
-                remove_fired(label, due_at_str)
-                continue
-        elif due_at < stale_cutoff:
-            remove_fired(label, due_at_str)
             continue
 
         if due_at <= now:
@@ -228,8 +285,7 @@ def _check_and_fire() -> None:
                 acknowledged = escalate(reminder)
 
                 if acknowledged:
-                    log_fired(label)
-                    remove_fired(label, due_at_str)
+                    mark_done(label)
                 else:
                     _snooze_reminder(label, due_at_str)
 

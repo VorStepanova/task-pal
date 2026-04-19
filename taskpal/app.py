@@ -20,8 +20,8 @@ from taskpal.reminders import scheduler
 from taskpal.reminders import config_scheduler
 from taskpal.reminders import skincare_scheduler
 from taskpal.reminders.state import (
-    load_pending, log_fired, remove_fired, remove_all_for_label,
-    dismiss_today, snooze_for_hours,
+    clear_all_pending, load_pending, mark_done, mark_dismissed, mark_pending,
+    snooze_for_hours,
 )
 
 
@@ -58,6 +58,8 @@ class TaskPalApp(rumps.App):
             self._history_item,
             self._retention_item,
             rumps.separator,
+            "🗑️ Clear pending",
+            rumps.separator,
             "🔄 Restart",
             "Quit",
         ]
@@ -84,6 +86,28 @@ class TaskPalApp(rumps.App):
         rows.sort(key=lambda x: x.get("due_at", ""))
         return rows
 
+    @staticmethod
+    def _row_status(r: dict) -> str:
+        """Return 'done', 'dismissed', 'snoozed', or 'pending' for one row."""
+        s = r.get("status")
+        if s in ("done", "dismissed"):
+            return s
+        next_fire = r.get("next_fire_at")
+        if next_fire:
+            try:
+                if datetime.fromisoformat(next_fire) > datetime.now():
+                    return "snoozed"
+            except (ValueError, TypeError):
+                pass
+        return "pending"
+
+    _STATUS_PREFIX = {
+        "pending": "",
+        "snoozed": "💤 ",
+        "done": "✅ ",
+        "dismissed": "❌ ",
+    }
+
     def _sync_pending_menu(self) -> None:
         """Rebuild Pending section above Quit from ~/.taskpal_pending_reminders.json."""
         for key in self._pending_menu_keys:
@@ -100,19 +124,19 @@ class TaskPalApp(rumps.App):
         to_insert: list[rumps.MenuItem] = []
         for r in rows:
             label = r.get("label", "Reminder")
-            due_at = r.get("due_at", "")
             emoji = r.get("emoji", "")
-            title = f"{emoji} {label}".strip()
+            status = self._row_status(r)
+            prefix = self._STATUS_PREFIX.get(status, "")
+            title = f"{prefix}{emoji} {label}".strip()
 
             parent = rumps.MenuItem(title)
 
             def _done_cb(_sender, lb=label) -> None:
-                log_fired(lb)
-                remove_all_for_label(lb)
+                mark_done(lb)
                 self._sync_pending_menu()
 
             def _not_today_cb(_sender, lb=label) -> None:
-                dismiss_today(lb)
+                mark_dismissed(lb)
                 self._sync_pending_menu()
 
             def _snooze_cb(_sender, lb=label, hrs=1) -> None:
@@ -123,15 +147,23 @@ class TaskPalApp(rumps.App):
                 snooze_for_hours(lb, 3)
                 self._sync_pending_menu()
 
+            def _pending_cb(_sender, lb=label) -> None:
+                mark_pending(lb)
+                self._sync_pending_menu()
+
             parent["✓ Done"] = rumps.MenuItem("✓ Done", callback=_done_cb)
             parent["Not today"] = rumps.MenuItem("Not today", callback=_not_today_cb)
             parent["Snooze 1h"] = rumps.MenuItem("Snooze 1h", callback=_snooze_cb)
             parent["Snooze 3h"] = rumps.MenuItem("Snooze 3h", callback=_snooze_3h_cb)
+            if status != "pending":
+                parent["↩︎ Mark pending"] = rumps.MenuItem(
+                    "↩︎ Mark pending", callback=_pending_cb
+                )
 
             to_insert.append(parent)
 
-        for item in reversed(to_insert):
-            self.menu.insert_before("Quit", item)
+        for item in to_insert:
+            self.menu.insert_after("🗑️ Clear pending", item)
             self._pending_menu_keys.append(item.title)
 
     def _tick(self, _sender: rumps.Timer) -> None:
@@ -199,6 +231,12 @@ class TaskPalApp(rumps.App):
     @rumps.clicked("💬 Open Chat")
     def _open_chat(self, _) -> None:
         self._chat_window.open()
+
+    @rumps.clicked("🗑️ Clear pending")
+    def _clear_pending(self, _) -> None:
+        """Wipe pending + dismissed state; config scheduler will re-queue today."""
+        clear_all_pending()
+        self._sync_pending_menu()
 
     @rumps.clicked("🔄 Restart")
     def _restart(self, _) -> None:

@@ -29,10 +29,18 @@ DEFAULTS: dict[str, Any] = {
 
 
 def is_demo() -> bool:
-    """Check if demo mode is active via config file or TASKPAL_DEMO env var."""
+    """Check if demo mode is active via TASKPAL_DEMO env var or config file.
+
+    Env var precedence is explicit in both directions — a truthy value forces
+    demo on, a falsy value forces it off, even if the config file disagrees.
+    Only an absent/empty env var falls through to the config file.
+    """
     import os
-    if os.environ.get("TASKPAL_DEMO", "").strip() in ("1", "true", "yes"):
+    raw = os.environ.get("TASKPAL_DEMO", "").strip().lower()
+    if raw in ("1", "true", "yes", "on"):
         return True
+    if raw in ("0", "false", "no", "off"):
+        return False
     if CONFIG_PATH.exists():
         try:
             with CONFIG_PATH.open("r", encoding="utf-8") as fh:

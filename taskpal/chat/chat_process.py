@@ -20,9 +20,11 @@ from datetime import datetime, timedelta
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(_HERE))
 
-# Load .env before any other taskpal imports so API keys are available
+# Load .env before any other taskpal imports so API keys are available.
+# override=True so .env wins over inherited shell exports — keeps demo flag
+# consistent with the parent process.
 from dotenv import load_dotenv  # noqa: E402
-load_dotenv(os.path.join(_PROJECT_ROOT, ".env"))
+load_dotenv(os.path.join(_PROJECT_ROOT, ".env"), override=True)
 
 import webview  # noqa: E402
 from taskpal.chat.client import TaskPalClient  # noqa: E402
@@ -345,8 +347,8 @@ class TaskPalBridge:
         from taskpal.config import is_demo
         if is_demo():
             return
-        from taskpal.reminders.state import dismiss_today
-        dismiss_today(label)
+        from taskpal.reminders.state import mark_dismissed
+        mark_dismissed(label)
 
     def snooze_reminder(self, label: str, hours: int) -> None:
         """Snooze a reminder for N hours."""

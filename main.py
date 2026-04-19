@@ -10,7 +10,9 @@ def main() -> None:
     """Start TaskPal."""
     import os
     from dotenv import load_dotenv
-    load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+    # override=True so .env is authoritative — shell exports don't
+    # silently win when a user edits .env and expects it to take effect.
+    load_dotenv(os.path.join(os.path.dirname(__file__), ".env"), override=True)
 
     from taskpal.app import TaskPalApp
     TaskPalApp().run()

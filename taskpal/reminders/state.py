@@ -14,6 +14,48 @@ from datetime import datetime, timedelta
 PENDING_PATH = os.path.expanduser("~/.taskpal_pending_reminders.json")
 COMPLETIONS_PATH = os.path.expanduser("~/.taskpal_completions.json")
 DISMISSED_PATH = os.path.expanduser("~/.taskpal_dismissed_today.json")
+LAST_MODE_PATH = os.path.expanduser("~/.taskpal_last_mode.json")
+
+
+def clear_all_pending() -> None:
+    """Wipe pending reminders and today's dismissed flags.
+
+    Completions history is preserved so streaks aren't affected.
+    """
+    for path in (PENDING_PATH, DISMISSED_PATH):
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except Exception:
+            pass
+
+
+def sync_mode_marker(current_demo: bool) -> bool:
+    """Compare the stored mode marker to current_demo and clear on mismatch.
+
+    Returns True if state was cleared due to a mode change. Writes the current
+    mode back to the marker so the next call matches. If no marker exists
+    (first run), the current mode is recorded and no state is cleared.
+    """
+    last: dict | None = None
+    if os.path.exists(LAST_MODE_PATH):
+        try:
+            with open(LAST_MODE_PATH) as f:
+                last = json.load(f)
+        except Exception:
+            last = None
+
+    cleared = False
+    if isinstance(last, dict) and "demo" in last and bool(last["demo"]) != current_demo:
+        clear_all_pending()
+        cleared = True
+
+    try:
+        with open(LAST_MODE_PATH, "w") as f:
+            json.dump({"demo": current_demo}, f)
+    except Exception:
+        pass
+    return cleared
 
 
 def _load_raw() -> list[dict]:
@@ -109,8 +151,7 @@ def _deduplicate(reminders: list[dict]) -> list[dict]:
     return out
 
 
-def dismiss_today(label: str) -> None:
-    """Mark a reminder label as dismissed for today. Removes all pending entries."""
+def _write_dismissed_today(label: str) -> None:
     today = datetime.now().strftime("%Y-%m-%d")
     dismissed: dict[str, str] = {}
     if os.path.exists(DISMISSED_PATH):
@@ -125,7 +166,84 @@ def dismiss_today(label: str) -> None:
             json.dump(dismissed, f, indent=2)
     except Exception:
         pass
+
+
+def _clear_dismissed_for_label(label: str) -> None:
+    if not os.path.exists(DISMISSED_PATH):
+        return
+    try:
+        with open(DISMISSED_PATH) as f:
+            dismissed = json.load(f)
+        if label not in dismissed:
+            return
+        del dismissed[label]
+        with open(DISMISSED_PATH, "w") as f:
+            json.dump(dismissed, f, indent=2)
+    except Exception:
+        pass
+
+
+def dismiss_today(label: str) -> None:
+    """Legacy: dismiss + remove from pending. Retained for any stale callers."""
+    _write_dismissed_today(label)
     remove_all_for_label(label)
+
+
+def mark_done(label: str) -> None:
+    """Flag all rows for label as done; log one completion per transition."""
+    if not os.path.exists(PENDING_PATH):
+        return
+    try:
+        with open(PENDING_PATH) as f:
+            reminders = json.load(f)
+        already_done = any(
+            r.get("label") == label and r.get("status") == "done"
+            for r in reminders
+        )
+        for r in reminders:
+            if r.get("label") == label:
+                r["status"] = "done"
+        with open(PENDING_PATH, "w") as f:
+            json.dump(reminders, f, indent=2)
+        if not already_done:
+            log_fired(label)
+    except Exception:
+        pass
+
+
+def mark_dismissed(label: str) -> None:
+    """Flag all rows for label as dismissed for today; rows stay in the menu."""
+    _write_dismissed_today(label)
+    if not os.path.exists(PENDING_PATH):
+        return
+    try:
+        with open(PENDING_PATH) as f:
+            reminders = json.load(f)
+        for r in reminders:
+            if r.get("label") == label:
+                r["status"] = "dismissed"
+        with open(PENDING_PATH, "w") as f:
+            json.dump(reminders, f, indent=2)
+    except Exception:
+        pass
+
+
+def mark_pending(label: str) -> None:
+    """Revert done/dismissed rows for label back to pending; clear any snooze."""
+    _clear_dismissed_for_label(label)
+    if not os.path.exists(PENDING_PATH):
+        return
+    try:
+        with open(PENDING_PATH) as f:
+            reminders = json.load(f)
+        for r in reminders:
+            if r.get("label") == label:
+                r["status"] = "pending"
+                r.pop("next_fire_at", None)
+        with open(PENDING_PATH, "w") as f:
+            json.dump(reminders, f, indent=2)
+    except Exception:
+        pass
 
 
 def is_dismissed_today(label: str) -> bool:
@@ -156,7 +274,12 @@ def remove_all_for_label(label: str) -> None:
 
 
 def snooze_for_hours(label: str, hours: int) -> None:
-    """Snooze all pending reminders for a label by N hours."""
+    """Snooze all pending reminders for a label by N hours.
+
+    Also reverts status to pending and clears any dismissed-today flag, so
+    snoozing acts as "un-done / un-dismissed, fire again in N hours".
+    """
+    _clear_dismissed_for_label(label)
     if not os.path.exists(PENDING_PATH):
         return
     try:
@@ -165,6 +288,7 @@ def snooze_for_hours(label: str, hours: int) -> None:
         target = (datetime.now() + timedelta(hours=hours)).isoformat(timespec="seconds")
         for r in reminders:
             if r.get("label") == label:
+                r["status"] = "pending"
                 r["next_fire_at"] = target
         with open(PENDING_PATH, "w") as f:
             json.dump(reminders, f, indent=2)

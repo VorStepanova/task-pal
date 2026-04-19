@@ -17,13 +17,19 @@ import subprocess
 import time
 
 
+# TaskPal's escalator sound. Kept distinct from cursor_nanny's palette
+# (Tink / Ping / Sosumi) so the two tools are audibly separable.
+# Swap to any of: Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse,
+# Pop, Purr, Submarine — all live in /System/Library/Sounds/.
+_ESCALATOR_SOUND = "/System/Library/Sounds/Glass.aiff"
+
+
 def _play_sound(times: int = 1) -> None:
-    sound = "/System/Library/Sounds/Sosumi.aiff"
     for i in range(times):
         if i > 0:
             time.sleep(0.05)
         try:
-            subprocess.Popen(["afplay", sound])
+            subprocess.Popen(["afplay", _ESCALATOR_SOUND])
         except Exception:
             pass
 
