@@ -25,7 +25,25 @@ DEFAULTS: dict[str, Any] = {
     "history_enabled": True,
     "history_retention_days": None,
     "demo": False,
+    "activity_share_enabled": True,
 }
+
+
+def is_activity_sharing_enabled() -> bool:
+    """Whether monitor data (active app, idle time) may be sent to Claude.
+
+    Reads the config file fresh each call so toggles made in the menu bar
+    take effect in the chat subprocess and scheduler thread without a restart.
+    Defaults to True to preserve behavior for users who never touch the setting.
+    """
+    if CONFIG_PATH.exists():
+        try:
+            with CONFIG_PATH.open("r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            return bool(data.get("activity_share_enabled", True))
+        except Exception:
+            pass
+    return True
 
 
 def is_demo() -> bool:

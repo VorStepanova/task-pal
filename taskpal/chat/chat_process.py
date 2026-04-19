@@ -74,9 +74,10 @@ def _load_agenda_items() -> list[dict]:
 
 
 def _get_response(text: str) -> str:
+    from taskpal.config import is_activity_sharing_enabled
     agenda_items = _load_agenda_items()
     show_buttons = _is_agenda_query(text)
-    monitor_snap = _read_monitor_snapshot()
+    monitor_snap = _read_monitor_snapshot() if is_activity_sharing_enabled() else None
 
     response = _client.send(
         text,
@@ -194,33 +195,36 @@ def _imminent_agenda(now: datetime) -> list[str]:
     return out
 
 
-def _consult_haiku(snap: dict, imminent: list[str]) -> str | None:
+def _consult_haiku(snap: dict | None, imminent: list[str]) -> str | None:
     """Ask Haiku if it wants to poke the user. Returns message or None for silence."""
     if not _ANTHROPIC_API_KEY:
         return None
     import anthropic
     now = datetime.now()
-    active_app = (snap.get("active_app") or "").strip() or "unknown"
-    try:
-        idle_min = int(snap.get("idle_secs") or 0) // 60
-    except (TypeError, ValueError):
-        idle_min = 0
-    try:
-        dwell_min = int(snap.get("app_duration_secs") or 0) // 60
-    except (TypeError, ValueError):
-        dwell_min = 0
     agenda_str = "; ".join(imminent) if imminent else "nothing imminent"
 
+    lines = [f"Current time: {now.strftime('%-I:%M %p, %A')}"]
+    if snap:
+        active_app = (snap.get("active_app") or "").strip() or "unknown"
+        try:
+            idle_min = int(snap.get("idle_secs") or 0) // 60
+        except (TypeError, ValueError):
+            idle_min = 0
+        try:
+            dwell_min = int(snap.get("app_duration_secs") or 0) // 60
+        except (TypeError, ValueError):
+            dwell_min = 0
+        lines.append(f"Active app: {active_app}")
+        lines.append(f"Time in that app: {dwell_min} min")
+        lines.append(f"User idle for: {idle_min} min")
+    lines.append(f"Imminent agenda (next 30 min): {agenda_str}")
+
     user_content = (
-        f"Current time: {now.strftime('%-I:%M %p, %A')}\n"
-        f"Active app: {active_app}\n"
-        f"Time in that app: {dwell_min} min\n"
-        f"User idle for: {idle_min} min\n"
-        f"Imminent agenda (next 30 min): {agenda_str}\n\n"
-        "You are being polled silently in the background. Is there something "
-        "genuinely useful or warm to say given this state? If yes, write ONE "
-        "sentence (max 14 words). If nothing meaningful to add, reply with a "
-        "single dash: -"
+        "\n".join(lines)
+        + "\n\nYou are being polled silently in the background. Is there "
+        "something genuinely useful or warm to say given this state? If yes, "
+        "write ONE sentence (max 14 words). If nothing meaningful to add, "
+        "reply with a single dash: -"
     )
     try:
         client = anthropic.Anthropic(api_key=_ANTHROPIC_API_KEY)
@@ -245,6 +249,7 @@ def _consult_haiku(snap: dict, imminent: list[str]) -> str | None:
 
 
 def _checkin_loop() -> None:
+    from taskpal.config import is_activity_sharing_enabled
     while True:
         time.sleep(_POLL_INTERVAL_SECS)
         now = datetime.now()
@@ -252,19 +257,21 @@ def _checkin_loop() -> None:
             continue
         if not _cooldown_ok("silent_poll"):
             continue
-        snap = _read_monitor_snapshot()
-        if not snap:
-            continue
-
-        idle = snap.get("idle_secs", 0) or 0
-        duration = snap.get("app_duration_secs", 0) or 0
+        share_activity = is_activity_sharing_enabled()
+        snap = _read_monitor_snapshot() if share_activity else None
         imminent = _imminent_agenda(now)
 
-        gated = (
-            idle >= _IDLE_THRESHOLD_SECS
-            or duration >= _APP_DWELL_THRESHOLD_SECS
-            or bool(imminent)
-        )
+        if share_activity and snap:
+            idle = snap.get("idle_secs", 0) or 0
+            duration = snap.get("app_duration_secs", 0) or 0
+            gated = (
+                idle >= _IDLE_THRESHOLD_SECS
+                or duration >= _APP_DWELL_THRESHOLD_SECS
+                or bool(imminent)
+            )
+        else:
+            # Privacy mode: only agenda imminence can trigger the poll.
+            gated = bool(imminent)
         if not gated:
             continue
 

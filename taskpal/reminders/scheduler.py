@@ -189,27 +189,32 @@ def _generate_nudge(label: str, context: str) -> str:
     plain = f"⏰ {label} — time to check in."
     if not _ANTHROPIC_API_KEY:
         return plain
+    from taskpal.config import is_activity_sharing_enabled
+    share_activity = is_activity_sharing_enabled()
     now = datetime.now()
-    snap = _read_monitor_snapshot()
-    active_app = snap.get("active_app") or "unknown"
-    idle_secs = 0
-    try:
-        idle_secs = int(snap.get("idle_secs", 0))
-    except (TypeError, ValueError):
-        pass
-    idle_min = idle_secs // 60
     agenda = _remaining_agenda(now, label)
     agenda_str = "; ".join(agenda) if agenda else "nothing else today"
 
+    lines = [
+        f"Reminder about to fire: {label}",
+        f"Static context for this reminder: {context or '(none)'}",
+        f"Current time: {now.strftime('%-I:%M %p, %A')}",
+    ]
+    if share_activity:
+        snap = _read_monitor_snapshot()
+        active_app = snap.get("active_app") or "unknown"
+        try:
+            idle_min = int(snap.get("idle_secs", 0)) // 60
+        except (TypeError, ValueError):
+            idle_min = 0
+        lines.append(f"Active app: {active_app}")
+        lines.append(f"User idle for: {idle_min} min")
+    lines.append(f"Remaining agenda today: {agenda_str}")
+
     user_content = (
-        f"Reminder about to fire: {label}\n"
-        f"Static context for this reminder: {context or '(none)'}\n"
-        f"Current time: {now.strftime('%-I:%M %p, %A')}\n"
-        f"Active app: {active_app}\n"
-        f"User idle for: {idle_min} min\n"
-        f"Remaining agenda today: {agenda_str}\n\n"
-        "If you have something genuinely useful or warm to add, write ONE "
-        "sentence (max 14 words). If you have nothing meaningful to add, "
+        "\n".join(lines)
+        + "\n\nIf you have something genuinely useful or warm to add, write "
+        "ONE sentence (max 14 words). If you have nothing meaningful to add, "
         "reply with a single dash: -"
     )
 
