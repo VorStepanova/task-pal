@@ -145,10 +145,13 @@ def _save_completions(completions: list) -> None:
         json.dump(existing, f, indent=2)
 
 
-_IDLE_THRESHOLD_SECS = 1800       # 30 minutes
-_APP_DWELL_THRESHOLD_SECS = 7200  # 2 hours
-_POLL_INTERVAL_SECS = 900         # 15 minutes
-_COOLDOWN_SECS = 3600             # 1 hour per trigger
+_IDLE_THRESHOLD_SECS = 1800            # 30 minutes
+_APP_DWELL_THRESHOLD_SECS = 7200       # 2 hours
+_AGENDA_IMMINENT_SECS = 1800           # agenda item due within 30 min
+_POLL_INTERVAL_SECS = 900              # 15 minutes
+_COOLDOWN_SECS = 3600                  # 1 hour between silent pokes
+_POLL_MODEL = "claude-haiku-4-5"
+_ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 
 _last_fired: dict[str, datetime] = {}
 
@@ -170,30 +173,106 @@ def _cooldown_ok(key: str) -> bool:
 def _fire(message: str, key: str) -> None:
     global _window_ref
     _last_fired[key] = datetime.now()
+    _client.inject_assistant(message)
     if _window_ref is not None:
-        safe = message.replace("\\", "\\\\").replace("'", "\\'")
+        safe = message.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
         _window_ref.evaluate_js(f"injectAssistantMessage('{safe}')")
+
+
+def _imminent_agenda(now: datetime) -> list[str]:
+    """Labels with due_at within the next _AGENDA_IMMINENT_SECS seconds."""
+    out: list[str] = []
+    for it in _load_agenda_items():
+        due_str = it.get("due_at", "")
+        try:
+            due = datetime.fromisoformat(due_str)
+        except (ValueError, TypeError):
+            continue
+        delta = (due - now).total_seconds()
+        if 0 <= delta <= _AGENDA_IMMINENT_SECS:
+            out.append(f"{it.get('label', '')} in {int(delta // 60)} min")
+    return out
+
+
+def _consult_haiku(snap: dict, imminent: list[str]) -> str | None:
+    """Ask Haiku if it wants to poke the user. Returns message or None for silence."""
+    if not _ANTHROPIC_API_KEY:
+        return None
+    import anthropic
+    now = datetime.now()
+    active_app = (snap.get("active_app") or "").strip() or "unknown"
+    try:
+        idle_min = int(snap.get("idle_secs") or 0) // 60
+    except (TypeError, ValueError):
+        idle_min = 0
+    try:
+        dwell_min = int(snap.get("app_duration_secs") or 0) // 60
+    except (TypeError, ValueError):
+        dwell_min = 0
+    agenda_str = "; ".join(imminent) if imminent else "nothing imminent"
+
+    user_content = (
+        f"Current time: {now.strftime('%-I:%M %p, %A')}\n"
+        f"Active app: {active_app}\n"
+        f"Time in that app: {dwell_min} min\n"
+        f"User idle for: {idle_min} min\n"
+        f"Imminent agenda (next 30 min): {agenda_str}\n\n"
+        "You are being polled silently in the background. Is there something "
+        "genuinely useful or warm to say given this state? If yes, write ONE "
+        "sentence (max 14 words). If nothing meaningful to add, reply with a "
+        "single dash: -"
+    )
+    try:
+        client = anthropic.Anthropic(api_key=_ANTHROPIC_API_KEY)
+        response = client.messages.create(
+            model=_POLL_MODEL,
+            max_tokens=80,
+            system=(
+                "You are TaskPal, a warm but direct personal accountability "
+                "companion. You run in the user's menu bar. A silent background "
+                "check is asking you: anything to say right now? Be personal "
+                "and specific; silence is fine — prefer a dash over generic "
+                "filler. No preamble. No emoji unless it fits naturally."
+            ),
+            messages=[{"role": "user", "content": user_content}],
+        )
+        text = response.content[0].text.strip()
+    except Exception:
+        return None
+    if not text or text == "-":
+        return None
+    return text
 
 
 def _checkin_loop() -> None:
     while True:
-        now_hour = datetime.now().hour
-        if 0 <= now_hour < 7:
-            time.sleep(_POLL_INTERVAL_SECS)
-            continue
         time.sleep(_POLL_INTERVAL_SECS)
+        now = datetime.now()
+        if 0 <= now.hour < 7:
+            continue
+        if not _cooldown_ok("silent_poll"):
+            continue
         snap = _read_monitor_snapshot()
         if not snap:
             continue
 
-        idle = snap.get("idle_secs", 0)
-        duration = snap.get("app_duration_secs", 0)
-        app = snap.get("active_app", "that app")
+        idle = snap.get("idle_secs", 0) or 0
+        duration = snap.get("app_duration_secs", 0) or 0
+        imminent = _imminent_agenda(now)
 
-        if idle >= _IDLE_THRESHOLD_SECS and _cooldown_ok("idle"):
-            _fire("Hey, you've gone quiet — everything okay? 👀", "idle")
-        elif duration >= _APP_DWELL_THRESHOLD_SECS and _cooldown_ok("dwell"):
-            _fire(f"You've been in {app} for over 2 hours. Still on track? 🤔", "dwell")
+        gated = (
+            idle >= _IDLE_THRESHOLD_SECS
+            or duration >= _APP_DWELL_THRESHOLD_SECS
+            or bool(imminent)
+        )
+        if not gated:
+            continue
+
+        message = _consult_haiku(snap, imminent)
+        if message:
+            _fire(message, "silent_poll")
+        else:
+            _last_fired["silent_poll"] = now
 
 
 def _save_queue(queue: list[dict]) -> None:
